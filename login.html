@@ -152,8 +152,8 @@ async function fazerLogin() {
     localStorage.setItem('bot_name',    data.name);
     localStorage.setItem('bot_api_url', apiUrl);
 
-    // Redireciona pro dashboard
-    window.location.replace('/dashboard');
+    // Redireciona pro dashboard passando token na URL
+    window.location.replace('/dashboard?token=' + encodeURIComponent(data.token) + '&user=' + data.username + '&role=' + data.role + '&name=' + encodeURIComponent(data.name));
 
   } catch(e) {
     mostrarErro('Não foi possível conectar à API. Verifique a URL.');

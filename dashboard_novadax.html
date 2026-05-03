@@ -433,6 +433,18 @@
 
 <script>
 // ── Autenticação ───────────────────────────
+// Tenta pegar token da URL (vindo do login)
+const urlParams = new URLSearchParams(window.location.search);
+const tokenFromUrl = urlParams.get('token');
+if (tokenFromUrl) {
+  localStorage.setItem('bot_token',   tokenFromUrl);
+  localStorage.setItem('bot_user',    urlParams.get('user') || '');
+  localStorage.setItem('bot_role',    urlParams.get('role') || '');
+  localStorage.setItem('bot_name',    urlParams.get('name') || '');
+  // Limpa a URL
+  window.history.replaceState({}, '', '/dashboard');
+}
+
 const token   = localStorage.getItem('bot_token');
 const botUser = localStorage.getItem('bot_name') || localStorage.getItem('bot_user');
 const botRole = localStorage.getItem('bot_role');
