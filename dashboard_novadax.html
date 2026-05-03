@@ -433,21 +433,19 @@
 
 <script>
 // ── Autenticação ───────────────────────────
-// Tenta pegar token da URL (vindo do login)
-const urlParams = new URLSearchParams(window.location.search);
-const tokenFromUrl = urlParams.get('token');
-if (tokenFromUrl) {
-  localStorage.setItem('bot_token',   tokenFromUrl);
-  localStorage.setItem('bot_user',    urlParams.get('user') || '');
-  localStorage.setItem('bot_role',    urlParams.get('role') || '');
-  localStorage.setItem('bot_name',    urlParams.get('name') || '');
-  // Limpa a URL
-  window.history.replaceState({}, '', '/dashboard');
+// Lê sessão do storage
+function getSession() {
+  const raw = sessionStorage.getItem('bot_session') 
+           || localStorage.getItem('bot_session');
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch(e) { return null; }
 }
 
-const token   = localStorage.getItem('bot_token');
-const botUser = localStorage.getItem('bot_name') || localStorage.getItem('bot_user');
-const botRole = localStorage.getItem('bot_role');
+const session = getSession();
+const token   = session ? session.token : null;
+const botUser = session ? (session.name || session.user) : null;
+const botRole = session ? session.role : null;
+const botApiUrl = session ? session.apiUrl : (localStorage.getItem('bot_api_url') || window.location.origin);
 
 if (!token) {
   window.location.replace('/');
@@ -456,19 +454,18 @@ if (!token) {
 function getHeaders() {
   return {
     'ngrok-skip-browser-warning': 'true',
+    'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`
   };
 }
 
 function logout() {
-  localStorage.removeItem('bot_token');
-  localStorage.removeItem('bot_user');
-  localStorage.removeItem('bot_role');
-  localStorage.removeItem('bot_name');
+  sessionStorage.removeItem('bot_session');
+  localStorage.removeItem('bot_session');
   window.location.replace('/');
 }
 
-let API_URL = localStorage.getItem('bot_api_url') || 'http://localhost:5000';
+let API_URL = botApiUrl;
 let chart = null;
 let capitalHistory = [];
 let interval = null;
