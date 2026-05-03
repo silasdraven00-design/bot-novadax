@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bot NovaDAX — Login</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  :root {
+    --bg: #0a1628; --card: #0f2040; --blue: #00d4ff;
+    --green: #00ff88; --red: #ff4455; --muted: #4a6380;
+    --text: #e2e8f0; --mono: 'Share Tech Mono', monospace;
+  }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', sans-serif;
+    min-height: 100vh; display: flex;
+    align-items: center; justify-content: center;
+  }
+  .login-card {
+    background: var(--card); border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 16px; padding: 48px 40px; width: 380px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+  }
+  .logo { text-align: center; margin-bottom: 32px; }
+  .logo .icon { font-size: 40px; margin-bottom: 8px; }
+  .logo h1 { font-size: 22px; color: var(--blue); letter-spacing: 2px; }
+  .logo p { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .field { margin-bottom: 20px; }
+  .field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  .field input {
+    width: 100%; padding: 12px 16px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 8px; color: var(--text); font-size: 14px; outline: none;
+    font-family: var(--mono); transition: border-color .2s;
+  }
+  .field input:focus { border-color: var(--blue); }
+  .btn-login {
+    width: 100%; padding: 14px;
+    background: linear-gradient(135deg, #00d4ff, #0088cc);
+    border: none; border-radius: 8px; color: #fff;
+    font-size: 14px; font-weight: 700; letter-spacing: 1px;
+    cursor: pointer; transition: opacity .2s;
+  }
+  .btn-login:hover { opacity: 0.9; }
+  .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+  .error {
+    background: rgba(255,68,85,0.1); border: 1px solid rgba(255,68,85,0.3);
+    border-radius: 8px; padding: 10px 14px;
+    color: var(--red); font-size: 13px; margin-bottom: 16px; display: none;
+  }
+  .api-field { margin-bottom: 24px; }
+  .api-field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 1px; }
+  .api-field input {
+    width: 100%; padding: 10px 14px;
+    background: rgba(0,0,0,0.3); border: 1px solid rgba(0,212,255,0.1);
+    border-radius: 6px; color: var(--muted); font-size: 12px; outline: none;
+    font-family: var(--mono);
+  }
+  .version { text-align: center; margin-top: 24px; font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="login-card">
+  <div class="logo">
+    <div class="icon">₿</div>
+    <h1>BOT NOVADAX</h1>
+    <p>Trading Automatizado — Conta Real</p>
+  </div>
+
+  <div class="error" id="errorMsg"></div>
+
+  <div class="field">
+    <label>Usuário</label>
+    <input type="text" id="username" placeholder="seu usuário" autocomplete="username" />
+  </div>
+
+  <div class="field">
+    <label>Senha</label>
+    <input type="password" id="password" placeholder="••••••••" autocomplete="current-password" />
+  </div>
+
+  <button class="btn-login" id="btnLogin" onclick="fazerLogin()">ENTRAR</button>
+
+  <!-- URL da API oculta — só aparece se clicar em "configurar" -->
+  <div style="text-align:center;margin-top:16px">
+    <span onclick="toggleConfig()" style="font-size:11px;color:var(--muted);cursor:pointer">⚙️ Configurar servidor</span>
+  </div>
+  <div id="configArea" style="display:none;margin-top:12px">
+    <div class="api-field">
+      <label>URL da API</label>
+      <input type="text" id="apiUrl" placeholder="https://seu-bot.railway.app" />
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL_DEFAULT = localStorage.getItem('bot_api_url') || 'http://localhost:5000';
+
+function toggleConfig() {
+  const area = document.getElementById('configArea');
+  const input = document.getElementById('apiUrl');
+  if (area.style.display === 'none') {
+    area.style.display = 'block';
+    input.value = API_URL_DEFAULT;
+  } else {
+    area.style.display = 'none';
+  }
+}
+
+document.getElementById('password').addEventListener('keypress', e => {
+  if (e.key === 'Enter') fazerLogin();
+});
+
+async function fazerLogin() {
+  const apiUrlInput = document.getElementById('apiUrl');
+  const apiUrl   = (apiUrlInput && apiUrlInput.value.trim()) 
+                   ? apiUrlInput.value.trim().replace(/\/$/, '') 
+                   : API_URL_DEFAULT;
+  const username = document.getElementById('username').value.trim();
+  const password = document.getElementById('password').value;
+  const btn      = document.getElementById('btnLogin');
+  const errEl    = document.getElementById('errorMsg');
+
+  if (!username || !password) {
+    mostrarErro('Preencha usuário e senha');
+    return;
+  }
+
+  btn.disabled    = true;
+  btn.textContent = 'Entrando...';
+  errEl.style.display = 'none';
+
+  try {
+    const res = await fetch(`${apiUrl}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      mostrarErro(data.error || 'Erro ao fazer login');
+      return;
+    }
+
+    // Salva token e URL
+    localStorage.setItem('bot_token',   data.token);
+    localStorage.setItem('bot_user',    data.username);
+    localStorage.setItem('bot_role',    data.role);
+    localStorage.setItem('bot_name',    data.name);
+    localStorage.setItem('bot_api_url', apiUrl);
+
+    // Redireciona pro dashboard
+    window.location.href = 'dashboard_novadax.html';
+
+  } catch(e) {
+    mostrarErro('Não foi possível conectar à API. Verifique a URL.');
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = 'ENTRAR';
+  }
+}
+
+function mostrarErro(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent    = msg;
+  el.style.display  = 'block';
+}
+
+// Se já tem token válido, vai direto pro dashboard
+const token = localStorage.getItem('bot_token');
+if (token) window.location.href = 'dashboard_novadax.html';
+</script>
+</body>
+</html>

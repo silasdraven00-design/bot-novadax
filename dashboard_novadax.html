@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bot Trading — NovaDAX</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;500;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:       #060a0f;
+    --surface:  #0d1520;
+    --border:   #1a2d45;
+    --green:    #00ff88;
+    --red:      #ff3b5c;
+    --yellow:   #ffd166;
+    --blue:     #38bdf8;
+    --muted:    #4a6380;
+    --text:     #c8dff0;
+    --mono:     'Share Tech Mono', monospace;
+    --sans:     'Rajdhani', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    padding: 24px;
+  }
+  /* scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,136,0.015) 2px, rgba(0,255,136,0.015) 4px);
+    pointer-events: none; z-index: 999;
+  }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 28px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+  }
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    border: 2px solid var(--green);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 0 12px rgba(0,255,136,0.3);
+  }
+  h1 { font-size: 22px; font-weight: 700; letter-spacing: 2px; color: #fff; }
+  h1 span { color: var(--green); }
+
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .api-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 6px 12px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    width: 280px;
+    outline: none;
+  }
+  .api-input:focus { border-color: var(--blue); }
+  .btn {
+    background: var(--green);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 7px 16px;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    letter-spacing: 1px;
+    transition: opacity .2s;
+  }
+  .btn:hover { opacity: 0.85; }
+
+  .status-bar {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 12px;
+  }
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--muted);
+    animation: pulse 2s infinite;
+  }
+  .dot.online  { background: var(--green); box-shadow: 0 0 8px var(--green); }
+  .dot.offline { background: var(--red); animation: none; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+  /* Grid principal */
+  .grid-top {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 16px;
+  }
+  .grid-bottom {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::after {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+  }
+  .card.green::after  { background: linear-gradient(90deg, transparent, var(--green), transparent); }
+  .card.red::after    { background: linear-gradient(90deg, transparent, var(--red), transparent); }
+  .card.blue::after   { background: linear-gradient(90deg, transparent, var(--blue), transparent); }
+  .card.yellow::after { background: linear-gradient(90deg, transparent, var(--yellow), transparent); }
+
+  .card-label {
+    font-size: 11px; font-weight: 500; letter-spacing: 2px;
+    color: var(--muted); text-transform: uppercase; margin-bottom: 10px;
+  }
+  .card-value {
+    font-family: var(--mono);
+    font-size: 28px;
+    font-weight: 400;
+    color: #fff;
+    line-height: 1;
+  }
+  .card-value.green  { color: var(--green); }
+  .card-value.red    { color: var(--red); }
+  .card-value.yellow { color: var(--yellow); }
+  .card-sub {
+    font-size: 12px; color: var(--muted);
+    margin-top: 6px; font-family: var(--mono);
+  }
+
+  /* Posição */
+  .posicao-badge {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px; font-weight: 700; letter-spacing: 1px;
+    font-family: var(--mono);
+  }
+  .posicao-badge.aberta  { background: rgba(0,255,136,.15); color: var(--green); border: 1px solid var(--green); }
+  .posicao-badge.fechada { background: rgba(74,99,128,.15); color: var(--muted); border: 1px solid var(--muted); }
+
+  /* RSI gauge */
+  .rsi-bar-wrap { margin-top: 10px; }
+  .rsi-bar-bg {
+    height: 6px; border-radius: 3px;
+    background: linear-gradient(90deg, var(--green) 0%, var(--yellow) 45%, var(--red) 100%);
+    position: relative;
+  }
+  .rsi-needle {
+    position: absolute; top: -4px;
+    width: 2px; height: 14px;
+    background: #fff;
+    border-radius: 1px;
+    transform: translateX(-50%);
+    transition: left .5s ease;
+  }
+  .rsi-labels {
+    display: flex; justify-content: space-between;
+    font-size: 10px; color: var(--muted); margin-top: 4px;
+    font-family: var(--mono);
+  }
+
+  /* Progress bar transações */
+  .prog-wrap { margin-top: 10px; }
+  .prog-bg {
+    height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+  }
+  .prog-fill {
+    height: 100%; border-radius: 3px;
+    background: var(--blue);
+    transition: width .4s ease;
+  }
+
+  /* Tabela histórico */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left; padding: 8px 12px;
+    font-size: 10px; letter-spacing: 2px; color: var(--muted);
+    text-transform: uppercase; border-bottom: 1px solid var(--border);
+    font-family: var(--sans);
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(26,45,69,.5);
+    font-family: var(--mono); font-size: 12px;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(56,189,248,.04); }
+  .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 4px;
+    font-size: 10px; font-weight: 700; letter-spacing: 1px;
+  }
+  .tag.win  { background: rgba(0,255,136,.15); color: var(--green); }
+  .tag.loss { background: rgba(255,59,92,.15);  color: var(--red); }
+  .tag.sl   { background: rgba(255,59,92,.2);   color: var(--red); }
+  .tag.tp   { background: rgba(0,255,136,.2);   color: var(--green); }
+  .tag.trail { background: rgba(56,189,248,.15); color: var(--blue); }
+  .tag.ma   { background: rgba(255,209,102,.15); color: var(--yellow); }
+
+  /* Chart */
+  .chart-wrap { position: relative; height: 240px; }
+
+  /* Sandbox badge */
+  .sandbox-badge {
+    background: rgba(255,209,102,.1);
+    border: 1px solid var(--yellow);
+    color: var(--yellow);
+    padding: 4px 10px; border-radius: 4px;
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    font-family: var(--mono);
+  }
+
+  .update-time { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  @media (max-width: 900px) {
+    .grid-top { grid-template-columns: repeat(2,1fr); }
+    .grid-bottom { grid-template-columns: 1fr; }
+    .api-input { width: 200px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">₿</div>
+    <div>
+      <h1>BOT <span>NOVADAX</span></h1>
+    </div>
+  </div>
+  <div class="header-right">
+    <div id="userBadge" class="sandbox-badge" style="display:none;border-color:var(--green);color:var(--green)"></div>
+    <div id="sandboxBadge" class="sandbox-badge" style="display:none">🟢 REAL</div>
+    <div id="simBadge" class="sandbox-badge" style="display:none;border-color:var(--green);color:var(--green)">💰 NovaDAX Real</div>
+    <input class="api-input" id="apiUrl" placeholder="http://localhost:5000" value="http://localhost:5000" />
+    <button class="btn" onclick="conectar()">CONECTAR</button>
+    <div class="status-bar">
+      <div class="dot" id="dot"></div>
+      <span id="statusLabel">desconectado</span>
+    </div>
+  </div>
+</header>
+
+<!-- Cards topo -->
+<div class="grid-top">
+
+  <div class="card blue">
+    <div class="card-label" id="precoLabel">Preço BTC/BRL</div>
+    <div class="card-value" id="preco">—</div>
+    <div class="card-sub" id="sinalAtual">Sinal: —</div>
+  </div>
+
+  <div class="card" id="cardPnl">
+    <div class="card-label">P&L Posição Atual</div>
+    <div class="card-value" id="pnlPct">—</div>
+    <div class="card-sub" id="pnlUsd">—</div>
+  </div>
+
+  <div class="card green">
+    <div class="card-label">Capital Atual</div>
+    <div class="card-value green" id="capitalAtual">—</div>
+    <div class="card-sub" id="capitalInicial">Inicial: —</div>
+    <div class="card-sub" id="saldoBrl" style="margin-top:4px">BRL livre: —</div>
+    <div class="card-sub" id="saldoCripto" style="margin-top:4px">Em cripto: —</div>
+    <div class="card-sub" id="saldoTotal" style="margin-top:4px;color:var(--green)">Total conta: —</div>
+  </div>
+
+  <div class="card yellow">
+    <div class="card-label">Resultado do Dia</div>
+    <div class="card-value" id="resultadoDia">—</div>
+    <div class="card-sub" id="winLoss">— wins / — losses</div>
+  </div>
+
+</div>
+
+<!-- Cards meio -->
+<div class="grid-top" style="margin-bottom:16px">
+
+  <div class="card" style="grid-column: span 2">
+    <div class="card-label" style="margin-bottom:10px">Posições Abertas <span id="posicaoCount" style="color:var(--blue)">0/3</span></div>
+    <div id="posicoesList" style="display:flex;flex-direction:column;gap:8px">
+      <span style="color:var(--muted);font-size:12px">Sem posições abertas</span>
+    </div>
+    <div class="card-sub" id="pnlTotal" style="margin-top:10px;font-size:13px">P&L Total: —</div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">RSI (14)</div>
+    <div class="card-value" id="rsiVal">—</div>
+    <div class="rsi-bar-wrap">
+      <div class="rsi-bar-bg">
+        <div class="rsi-needle" id="rsiNeedle" style="left:50%"></div>
+      </div>
+      <div class="rsi-labels"><span>0</span><span>30</span><span>70</span><span>100</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Transações Hoje</div>
+    <div class="card-value" id="transacoes">—</div>
+    <div class="prog-wrap">
+      <div class="prog-bg"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+    <div class="card-sub" id="winrate">Win Rate: —</div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">Reserva</div>
+    <div class="card-value" id="reserva">—</div>
+    <div class="card-sub" id="reservaStatus">—</div>
+  </div>
+
+</div>
+
+<!-- Carteira completa em tempo real -->
+<div class="card" style="margin-top:16px">
+  <div class="card-label" style="margin-bottom:12px">💼 Carteira Completa — Tempo Real</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Moeda</th>
+          <th>Quantidade</th>
+          <th>Preço Atual</th>
+          <th>Valor em BRL</th>
+          <th>Variação</th>
+        </tr>
+      </thead>
+      <tbody id="tabelaCarteira">
+        <tr><td colspan="4" style="color:var(--muted);text-align:center;padding:16px">Aguardando...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="margin-top:10px;font-family:var(--mono);font-size:12px">
+    BRL livre: <span id="brlLivreCarteira" style="color:var(--green)">—</span>
+    &nbsp;|&nbsp; Total carteira: <span id="totalCarteira" style="color:var(--green);font-weight:700">—</span>
+  </div>
+</div>
+
+<!-- Monitor de Pares — agora em cima -->
+<div class="card" style="margin-top:16px">
+  <div class="card-label" style="margin-bottom:16px">Monitor de Pares — Análise em Tempo Real</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Par</th>
+          <th>Preço</th>
+          <th>Score</th>
+          <th>Sinal</th>
+          <th>RSI</th>
+          <th>MA9</th>
+          <th>MA21</th>
+          <th>Volume</th>
+          <th>Queda 24h</th>
+          <th>Win Rate</th>
+          <th>Motivo</th>
+        </tr>
+      </thead>
+      <tbody id="tabelaPares">
+        <tr><td colspan="10" style="color:var(--muted);text-align:center;padding:24px">Aguardando análise...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Gráfico + Histórico — agora embaixo -->
+<div class="grid-bottom" style="margin-top:16px">
+
+  <div class="card blue">
+    <div class="card-label" style="margin-bottom:16px">Evolução do Capital</div>
+    <div class="chart-wrap">
+      <canvas id="chartCapital"></canvas>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label" style="margin-bottom:16px">Histórico de Operações</div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Par</th>
+            <th>Tipo</th>
+            <th>Compra</th>
+            <th>Venda</th>
+            <th>P&L</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tabelaHistorico">
+          <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Sem operações ainda</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<!-- Feed de eventos em tempo real -->
+<div class="card" style="margin-top:16px">
+  <div class="card-label" style="margin-bottom:12px">Feed de Eventos — Tempo Real</div>
+  <div id="feedEventos" style="font-family:var(--mono);font-size:11px;max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+    <span style="color:var(--muted)">Aguardando eventos...</span>
+  </div>
+</div>
+
+<div style="margin-top:12px;text-align:right">
+  <span class="update-time" id="updateTime">—</span>
+</div>
+
+<script>
+// ── Autenticação ───────────────────────────
+const token   = localStorage.getItem('bot_token');
+const botUser = localStorage.getItem('bot_name') || localStorage.getItem('bot_user');
+const botRole = localStorage.getItem('bot_role');
+
+if (!token) {
+  window.location.href = 'login.html';
+}
+
+function getHeaders() {
+  return {
+    'ngrok-skip-browser-warning': 'true',
+    'Authorization': `Bearer ${token}`
+  };
+}
+
+function logout() {
+  localStorage.removeItem('bot_token');
+  localStorage.removeItem('bot_user');
+  localStorage.removeItem('bot_role');
+  localStorage.removeItem('bot_name');
+  window.location.href = 'login.html';
+}
+
+let API_URL = localStorage.getItem('bot_api_url') || 'http://localhost:5000';
+let chart = null;
+let capitalHistory = [];
+let interval = null;
+let tentativas_reconexao = 0;
+
+// ── Auto-detectar URL do ngrok ─────────────
+async function autoDetectarUrl() {
+  try {
+    const res  = await fetch('http://localhost:5000/ngrok_url');
+    const data = await res.json();
+    if (data.url) {
+      document.getElementById('apiUrl').value = data.url;
+      API_URL = data.url;
+      log('URL detectada automaticamente: ' + data.url);
+      return data.url;
+    }
+  } catch(e) {}
+  return null;
+}
+
+function log(msg) {
+  console.log('[Dashboard]', msg);
+}
+function initChart() {
+  const ctx = document.getElementById('chartCapital').getContext('2d');
+  chart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: [],
+      datasets: [{
+        label: 'Capital (USDT)',
+        data: [],
+        borderColor: '#38bdf8',
+        backgroundColor: 'rgba(56,189,248,0.08)',
+        borderWidth: 2,
+        pointRadius: 3,
+        pointBackgroundColor: '#38bdf8',
+        tension: 0.4,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#4a6380', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: '#1a2d45' } },
+        y: { ticks: { color: '#4a6380', font: { family: 'Share Tech Mono', size: 10 }, callback: v => 'R$'+v.toFixed(0) }, grid: { color: '#1a2d45' } }
+      }
+    }
+  });
+}
+
+function addCapitalPoint(capital) {
+  const now = new Date().toLocaleTimeString('pt-BR', { hour:'2-digit', minute:'2-digit' });
+  capitalHistory.push({ t: now, v: capital });
+  if (capitalHistory.length > 60) capitalHistory.shift();
+  chart.data.labels   = capitalHistory.map(p => p.t);
+  chart.data.datasets[0].data = capitalHistory.map(p => p.v);
+  chart.update('none');
+}
+
+// ── Conectar ───────────────────────────────
+function conectar() {
+  API_URL = document.getElementById('apiUrl').value.trim().replace(/\/$/, '');
+  if (!API_URL) return alert('Cole a URL da API!');
+  if (interval) clearInterval(interval);
+  atualizar();
+  interval = setInterval(atualizar, 10000);
+}
+
+// Tenta conectar local primeiro, depois ngrok
+async function tentarConexaoLocal() {
+  try {
+    const res = await fetch('http://localhost:5000/status', { signal: AbortSignal.timeout(2000) });
+    if (res.ok) {
+      API_URL = 'http://localhost:5000';
+      document.getElementById('apiUrl').value = API_URL;
+      console.log('[Dashboard] Conectado via localhost:5000');
+      atualizar();
+      interval = setInterval(atualizar, 10000);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+// ── Atualizar dados ────────────────────────
+async function atualizar() {
+  try {
+    const headers = { 'ngrok-skip-browser-warning': 'true' };
+    const checkAuth = (res) => {
+      if (res.status === 401) { logout(); throw new Error('Não autenticado'); }
+      return res;
+    };
+    const [statusRes, histRes, feedRes] = await Promise.all([
+      fetch(API_URL + '/status',    { headers }).then(checkAuth),
+      fetch(API_URL + '/historico', { headers }).then(checkAuth),
+      fetch(API_URL + '/feed',      { headers }).then(checkAuth),
+    ]);
+    const d = await statusRes.json();
+    const h = await histRes.json();
+    const f = await feedRes.json();
+
+    renderStatus(d);
+    renderHistorico(h);
+    renderPares(d.pares_detalhes);
+    renderCarteira(d.carteira_full, d.saldo_brl, d.saldo_total, d.posicoes);
+    renderFeed(f);
+    addCapitalPoint(d.capital_atual);
+    tentativas_reconexao = 0;
+
+    // Win rate por par
+    if (d.stats_pares) {
+      Object.entries(d.stats_pares).forEach(([par, stats]) => {
+        const id = 'wr_' + par.replace('/', '_');
+        const el = document.getElementById(id);
+        if (!el) return;
+        const total = stats.wins + stats.losses;
+        if (total < 5) { el.textContent = `${total} trades`; el.style.color = 'var(--muted)'; return; }
+        const wr  = (stats.wins / total * 100).toFixed(0);
+        const cor = wr >= 60 ? 'var(--green)' : wr >= 40 ? 'var(--yellow)' : 'var(--red)';
+        el.textContent = `${wr}% (${stats.wins}W/${stats.losses}L)`;
+        el.style.color = cor;
+      });
+    }
+
+    // Pausa por stops consecutivos
+    const statusLabel = document.getElementById('statusLabel');
+    if (d.pausado_ate) {
+      const hora = d.pausado_ate.substring(11, 16);
+      statusLabel.textContent = `⏸ pausado até ${hora}`;
+      statusLabel.style.color = 'var(--yellow)';
+    }
+
+  } catch(e) {
+    setOffline();
+    tentativas_reconexao++;
+    log(`Conexao perdida (tentativa ${tentativas_reconexao}) — tentando reconectar...`);
+    setTimeout(async () => {
+      const novaUrl = await autoDetectarUrl();
+      if (novaUrl) {
+        API_URL = novaUrl;
+        atualizar();
+      } else if (API_URL) {
+        atualizar();
+      }
+    }, 10000);
+  }
+}
+
+function renderFeed(eventos) {
+  const div = document.getElementById('feedEventos');
+  if (!eventos || eventos.length === 0) {
+    div.innerHTML = '<span style="color:var(--muted)">Aguardando eventos...</span>';
+    return;
+  }
+  const cores = {
+    'COMPRA': 'var(--green)',
+    'VENDA':  '#38bdf8',
+    'ALERTA': 'var(--red)',
+    'ERRO':   'var(--red)',
+    'INFO':   'var(--muted)',
+  };
+  div.innerHTML = eventos.map(e => {
+    const cor = cores[e.tipo] || 'var(--muted)';
+    return `<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid rgba(26,45,69,.3)">
+      <span style="color:var(--muted);min-width:70px">${e.hora}</span>
+      <span style="color:${cor};min-width:60px;font-weight:700">${e.tipo}</span>
+      <span style="color:var(--text)">${e.msg}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderStatus(d) {
+  setOnline(d.status);
+
+  // Sandbox + Simulação
+  document.getElementById('sandboxBadge').style.display = d.exchange === 'NovaDAX' ? 'inline-block' : 'none';
+  const simBadge = document.getElementById('simBadge');
+  if (d.capital_simulado) {
+    simBadge.style.display = 'inline-block';
+    simBadge.textContent = `💰 Simulando R$${d.capital_simulado}`;
+  } else {
+    simBadge.style.display = 'none';
+  }
+
+  // Label do preço — mostra par atual se posição aberta, senão BTC/BRL
+  const parLabel = (d.posicao_aberta && d.par_atual) ? d.par_atual : 'BTC/BRL';
+  document.getElementById('precoLabel').textContent = `Preço ${parLabel}`;
+
+  // Preço — se sem posição mostra preço do BTC/BRL
+  let precoMostrar = d.preco_atual;
+  if (!d.posicao_aberta && d.pares_detalhes && d.pares_detalhes['BTC/BRL']) {
+    precoMostrar = d.pares_detalhes['BTC/BRL'].preco;
+  }
+  document.getElementById('preco').textContent = 'R$' + Number(precoMostrar).toLocaleString('pt-BR', {minimumFractionDigits:2});
+
+  // Sinal
+  const sinalEl = document.getElementById('sinalAtual');
+  const cores   = { COMPRA: '#00ff88', VENDA: '#ff3b5c', NEUTRO: '#4a6380' };
+  sinalEl.innerHTML = `Sinal: <span style="color:${cores[d.sinal_atual]||'#4a6380'}">${d.sinal_atual}</span> &nbsp;|&nbsp; RSI: ${d.rsi_atual}`;
+
+  // P&L
+  const pnlEl  = document.getElementById('pnlPct');
+  const cardPnl = document.getElementById('cardPnl');
+  if (d.posicao_aberta) {
+    const cor = d.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)';
+    pnlEl.style.color = cor;
+    pnlEl.textContent = (d.pnl_pct >= 0 ? '+' : '') + d.pnl_pct + '%';
+    document.getElementById('pnlUsd').textContent = (d.pnl_usd >= 0 ? '+' : '') + 'R$' + d.pnl_usd.toFixed(2);
+    cardPnl.className = 'card ' + (d.pnl_pct >= 0 ? 'green' : 'red');
+  } else {
+    pnlEl.style.color = 'var(--muted)';
+    pnlEl.textContent = '—';
+    document.getElementById('pnlUsd').textContent = 'Sem posição aberta';
+    cardPnl.className = 'card';
+  }
+
+  // Capital
+  document.getElementById('capitalAtual').textContent = 'R$' + d.capital_atual.toFixed(2);
+  document.getElementById('capitalInicial').textContent = 'Inicial: R$' + (d.capital_inicial||0).toFixed(2);
+  document.getElementById('saldoBrl').textContent   = 'BRL livre: R$' + (d.saldo_brl||0).toFixed(2);
+  document.getElementById('saldoCripto').textContent = 'Em cripto: R$' + (d.saldo_cripto||0).toFixed(2);
+  document.getElementById('saldoTotal').textContent  = 'Total carteira: R$' + (d.saldo_total||0).toFixed(2);
+
+  // Resultado dia
+  const resEl  = document.getElementById('resultadoDia');
+  const resCor = d.resultado_dia >= 0 ? 'var(--green)' : 'var(--red)';
+  resEl.style.color = resCor;
+  resEl.textContent = (d.resultado_dia >= 0 ? '+' : '') + 'R$' + d.resultado_dia.toFixed(2);
+  document.getElementById('winLoss').textContent = `${d.wins_dia} wins / ${d.losses_dia} losses`;
+
+  // Posição badge
+  // Posições abertas
+  const posicoes   = d.posicoes || {};
+  const numPos = Object.keys(posicoes).length;
+  const numNovas = d.num_posicoes_novas || 0;
+  document.getElementById('posicaoCount').textContent = `${numNovas}/${d.max_posicoes} + ${d.num_posicoes_antigas || 0} antigas`;
+
+  const listaEl = document.getElementById('posicoesList');
+  if (numPos === 0) {
+    listaEl.innerHTML = '<span style="color:var(--muted);font-size:12px">Sem posições abertas</span>';
+  } else {
+    listaEl.innerHTML = Object.entries(posicoes).map(([par, pos]) => {
+      const cor = pos.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)';
+      return `<div style="display:flex;gap:12px;align-items:center;padding:6px 8px;background:rgba(26,45,69,.4);border-radius:6px;font-family:var(--mono);font-size:12px">
+        <span style="color:var(--blue);font-weight:700;min-width:80px">${par}</span>
+        <span>Compra: R$${pos.preco_compra}</span>
+        <span>Atual: R$${pos.preco_atual}</span>
+        <span>Qtd: ${pos.quantidade}</span>
+        <span>Total: R$${pos.total_invest}</span>
+        <span style="color:${cor};font-weight:700">${pos.pnl_pct >= 0 ? '+' : ''}${pos.pnl_pct}% (R$${pos.pnl_usd >= 0 ? '+' : ''}${pos.pnl_usd})</span>
+      </div>`;
+    }).join('');
+  }
+
+  const pnlTotalCor = (d.pnl_total_usd || 0) >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('pnlTotal').innerHTML = `P&L Total aberto: <span style="color:${pnlTotalCor};font-weight:700">${(d.pnl_total_usd||0) >= 0 ? '+' : ''}R$${(d.pnl_total_usd||0).toFixed(2)}</span>`;
+
+  // RSI
+  document.getElementById('rsiVal').textContent = d.rsi_atual;
+  document.getElementById('rsiNeedle').style.left = d.rsi_atual + '%';
+
+  // Transações
+  document.getElementById('transacoes').textContent = `${d.transacoes_dia} / ${d.limite_transacoes}`;
+  document.getElementById('progFill').style.width = (d.transacoes_dia / d.limite_transacoes * 100) + '%';
+  document.getElementById('winrate').textContent = `Win Rate: ${d.winrate}%`;
+
+  // Reserva
+  document.getElementById('reserva').textContent = d.reserva_usada ? 'USADA' : 'R$' + d.capital_reserva.toFixed(2);
+  document.getElementById('reservaStatus').textContent = d.reserva_usada ? '⚠️ Reserva utilizada hoje' : '20% do capital guardado';
+
+  // Update time
+  const dt = new Date(d.ultimo_update);
+  document.getElementById('updateTime').textContent = 'Atualizado: ' + dt.toLocaleTimeString('pt-BR');
+}
+
+function renderCarteira(carteira, saldo_brl, saldo_total, posicoes) {
+  const tbody = document.getElementById('tabelaCarteira');
+  const brlEl = document.getElementById('brlLivreCarteira');
+  const totEl = document.getElementById('totalCarteira');
+
+  if (brlEl) brlEl.textContent = 'R$' + (saldo_brl||0).toFixed(2);
+  // Total real = BRL + todas as criptos
+  const totalReal = (saldo_brl||0) + Object.values(carteira||{}).reduce((s, c) => s + (c.valor_brl||0), 0);
+  if (totEl) totEl.textContent = 'R$' + totalReal.toFixed(2);
+
+  if (!carteira || Object.keys(carteira).length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px">Sem criptos na carteira</td></tr>';
+    return;
+  }
+
+  const sorted = Object.entries(carteira).sort((a, b) => b[1].valor_brl - a[1].valor_brl);
+
+  tbody.innerHTML = sorted.map(([moeda, info]) => {
+    const par     = moeda + '/BRL';
+    const pos     = posicoes && posicoes[par];
+    const tipo    = pos ? (pos.tipo || 'antigo') : 'antigo';
+    const pnl_pct = pos ? (pos.pnl_pct || 0) : 0;
+    const pnlCor  = pnl_pct >= 10 ? 'var(--green)' : pnl_pct >= 0 ? '#4a9eff' : 'var(--red)';
+    const tipoBadge = tipo === 'avulso'
+      ? `<span style="color:var(--yellow);font-size:10px">AVULSO</span>`
+      : tipo === 'novo'
+        ? `<span style="color:var(--green);font-size:10px">TRADING</span>`
+        : `<span style="color:#4a9eff;font-size:10px">ANTIGA</span>`;
+    const metaBar = tipo === 'avulso'
+      ? `<span style="color:${pnlCor};font-size:10px">${pnl_pct >= 0 ? '+' : ''}${pnl_pct}% ${pnl_pct >= 10 ? '✅ VENDE!' : '/ meta 10%'}</span>`
+      : tipo === 'novo'
+        ? `<span style="color:${pnlCor};font-size:10px">${pnl_pct >= 0 ? '+' : ''}${pnl_pct}%</span>`
+        : `<span style="color:${pnlCor};font-size:10px">${pnl_pct >= 0 ? '+' : ''}${pnl_pct}% / vende +2.5%</span>`;
+
+    return `<tr>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--blue)">${moeda} ${tipoBadge}</td>
+      <td style="font-family:var(--mono);font-size:11px">${info.quantidade}</td>
+      <td style="font-family:var(--mono);font-size:11px">R$${Number(info.preco).toLocaleString('pt-BR', {minimumFractionDigits:4})}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--green)">R$${info.valor_brl.toFixed(2)}</td>
+      <td>${metaBar}</td>
+    </tr>`;
+  }).join('');
+}
+
+function renderHistorico(trades) {
+  const tbody = document.getElementById('tabelaHistorico');
+  if (!trades || trades.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:24px">Sem operações ainda</td></tr>';
+    return;
+  }
+  const reversed = [...trades].reverse();
+  tbody.innerHTML = reversed.map(t => {
+    const tagMap = {
+      'STOP LOSS': 'sl', 'TRAILING STOP': 'trail',
+      'SINAL MA': 'ma', 'LIMITE DIARIO': 'loss', 'ENCERRAMENTO MANUAL': 'ma'
+    };
+    const tagClass = tagMap[t.tipo] || (t.resultado === 'win' ? 'win' : 'loss');
+    const pnlCor   = t.pnl_usd >= 0 ? 'var(--green)' : 'var(--red)';
+    const par      = t.par || '—';
+    return `
+      <tr>
+        <td>${t.data}</td>
+        <td style="color:var(--blue);font-weight:700">${par}</td>
+        <td><span class="tag ${tagClass}">${t.tipo}</span></td>
+        <td>R$${t.preco_compra}</td>
+        <td>R$${t.preco_venda}</td>
+        <td style="color:${pnlCor}">${t.pnl_pct >= 0 ? '+' : ''}${t.pnl_pct}% (R$${t.pnl_usd >= 0 ? '+' : ''}${t.pnl_usd.toFixed(2)})</td>
+        <td><span class="tag ${t.resultado}">${t.resultado.toUpperCase()}</span></td>
+      </tr>`;
+  }).join('');
+}
+
+function renderPares(pares_detalhes) {
+  const tbody = document.getElementById('tabelaPares');
+  if (!pares_detalhes || Object.keys(pares_detalhes).length === 0) {
+    tbody.innerHTML = '<tr><td colspan="10" style="color:var(--muted);text-align:center;padding:24px">Aguardando análise...</td></tr>';
+    return;
+  }
+
+  const linhas = Object.entries(pares_detalhes)
+    .sort((a, b) => b[1].score - a[1].score)
+    .map(([par, d]) => {
+      const sinais = { COMPRA: 'green', NEUTRO: '', ERRO: 'loss' };
+      const corSinal = { COMPRA: 'var(--green)', NEUTRO: 'var(--muted)', ERRO: 'var(--red)' };
+      const volIcon  = d.volume_ok ? '<span style="color:var(--green)">✓</span>' : '<span style="color:var(--red)">✗</span>';
+      const scoreColor = d.score >= 7 ? 'var(--green)' : d.score >= 4 ? 'var(--yellow)' : 'var(--muted)';
+      const motivo = d.motivos ? d.motivos.join(' · ') : '—';
+      const rsiColor = d.rsi > 70 ? 'var(--red)' : d.rsi < 30 ? 'var(--green)' : 'var(--text)';
+
+      return `
+        <tr>
+          <td style="font-weight:700;color:var(--blue)">${par}</td>
+          <td style="font-family:var(--mono)">R$${Number(d.preco).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:6})}</td>
+          <td style="color:${scoreColor};font-weight:700;font-family:var(--mono)">${d.score}</td>
+          <td style="color:${corSinal[d.sinal] || 'var(--muted)'}"><b>${d.sinal}</b></td>
+          <td style="color:${rsiColor};font-family:var(--mono)">${d.rsi}</td>
+          <td style="font-family:var(--mono);font-size:11px">R$${Number(d.ma9).toLocaleString('en-US', {maximumFractionDigits:4})}</td>
+          <td style="font-family:var(--mono);font-size:11px">R$${Number(d.ma21).toLocaleString('en-US', {maximumFractionDigits:4})}</td>
+          <td>${volIcon}</td>
+          <td style="font-family:var(--mono);font-size:11px;color:${d.queda_24h <= -10 ? 'var(--red)' : d.queda_24h <= -5 ? 'var(--yellow)' : 'var(--muted)'}">
+            ${d.queda_24h !== undefined ? d.queda_24h + '%' : '—'}
+          </td>
+          <td id="wr_${par.replace('/','_')}" style="font-family:var(--mono);font-size:11px">—</td>
+          <td style="font-size:11px;color:var(--muted)">${motivo}</td>
+        </tr>`;
+    }).join('');
+
+  tbody.innerHTML = linhas;
+}
+
+function setOnline(status) {
+  document.getElementById('dot').className = 'dot online';
+  document.getElementById('statusLabel').textContent = status || 'online';
+}
+function setOffline() {
+  document.getElementById('dot').className = 'dot offline';
+  document.getElementById('statusLabel').textContent = 'sem conexão';
+}
+
+initChart();
+
+window.addEventListener('load', () => {
+  // Mostra usuário logado
+  const userBadge = document.getElementById('userBadge');
+  if (userBadge && botUser) {
+    userBadge.style.display = 'inline-block';
+    userBadge.innerHTML = `👤 ${botUser} <button onclick="logout()" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:11px;margin-left:6px">Sair</button>`;
+  }
+  API_URL = localStorage.getItem('bot_api_url') || 'http://localhost:5000';
+  atualizar();
+  interval = setInterval(atualizar, 10000);
+});
+</script>
+</body>
+</html>
