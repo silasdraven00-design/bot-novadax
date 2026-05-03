@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bot NovaDAX</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#0a1628; --card:#0f2040; --blue:#00d4ff; --green:#00ff88;
+  --red:#ff4455; --yellow:#ffd700; --muted:#4a6380; --text:#e2e8f0;
+  --mono:'Share Tech Mono',monospace;
+}
+body { background:var(--bg); color:var(--text); font-family:'Segoe UI',sans-serif; }
+
+/* ── LOGIN ── */
+#loginPage {
+  min-height:100vh; display:flex; align-items:center; justify-content:center;
+}
+.login-card {
+  background:var(--card); border:1px solid rgba(0,212,255,0.2);
+  border-radius:16px; padding:48px 40px; width:380px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.5);
+}
+.logo { text-align:center; margin-bottom:32px; }
+.logo .icon { font-size:40px; margin-bottom:8px; }
+.logo h1 { font-size:22px; color:var(--blue); letter-spacing:2px; }
+.logo p { font-size:12px; color:var(--muted); margin-top:4px; }
+.field { margin-bottom:20px; }
+.field label { display:block; font-size:11px; color:var(--muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+.field input {
+  width:100%; padding:12px 16px;
+  background:rgba(0,0,0,0.3); border:1px solid rgba(0,212,255,0.2);
+  border-radius:8px; color:var(--text); font-size:14px; outline:none;
+  transition:border-color .2s;
+}
+.field input:focus { border-color:var(--blue); }
+.btn-login {
+  width:100%; padding:14px; margin-top:8px;
+  background:linear-gradient(135deg,#00d4ff,#0088cc);
+  border:none; border-radius:8px; color:#fff;
+  font-size:14px; font-weight:700; letter-spacing:1px;
+  cursor:pointer; transition:opacity .2s;
+}
+.btn-login:hover { opacity:0.9; }
+.btn-login:disabled { opacity:0.5; cursor:not-allowed; }
+.login-error {
+  background:rgba(255,68,85,0.1); border:1px solid rgba(255,68,85,0.3);
+  border-radius:8px; padding:10px 14px; color:var(--red);
+  font-size:13px; margin-bottom:16px; display:none;
+}
+
+/* ── DASHBOARD ── */
+#dashPage { display:none; }
+.header {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 24px; background:rgba(15,32,64,0.95);
+  border-bottom:1px solid rgba(0,212,255,0.1); position:sticky; top:0; z-index:100;
+}
+.header-logo { display:flex; align-items:center; gap:12px; }
+.header-logo .icon { color:var(--blue); font-size:22px; }
+.header-logo h1 { font-size:16px; font-weight:400; letter-spacing:2px; }
+.header-logo span { color:var(--green); font-weight:700; }
+.header-right { display:flex; align-items:center; gap:12px; }
+.badge {
+  padding:4px 10px; border-radius:20px; font-size:11px;
+  border:1px solid; font-family:var(--mono);
+}
+.badge-real { border-color:var(--green); color:var(--green); }
+.badge-user { border-color:var(--blue); color:var(--blue); }
+.btn-logout {
+  padding:6px 14px; background:rgba(255,68,85,0.1);
+  border:1px solid rgba(255,68,85,0.3); border-radius:6px;
+  color:var(--red); font-size:12px; cursor:pointer;
+}
+.dot-status { width:8px; height:8px; border-radius:50%; background:var(--red); }
+.dot-status.online { background:var(--green); box-shadow:0 0 6px var(--green); }
+.main { padding:20px 24px; max-width:1600px; margin:0 auto; }
+.grid4 { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:16px; }
+.card {
+  background:var(--card); border:1px solid rgba(0,212,255,0.1);
+  border-radius:12px; padding:20px;
+}
+.card-label { font-size:10px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:8px; }
+.card-value { font-size:28px; font-weight:700; font-family:var(--mono); }
+.card-sub { font-size:12px; color:var(--muted); margin-top:4px; }
+.green { color:var(--green); }
+.red { color:var(--red); }
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th { text-align:left; padding:8px 12px; color:var(--muted); font-size:10px; text-transform:uppercase; border-bottom:1px solid rgba(0,212,255,0.1); }
+td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.03); }
+.pos-row { display:flex; gap:12px; align-items:center; padding:8px; background:rgba(26,45,69,.4); border-radius:6px; font-family:var(--mono); font-size:12px; margin-bottom:6px; }
+</style>
+</head>
+<body>
+
+<!-- TELA DE LOGIN -->
+<div id="loginPage">
+  <div class="login-card">
+    <div class="logo">
+      <div class="icon">₿</div>
+      <h1>BOT NOVADAX</h1>
+      <p>Trading Automatizado — Conta Real</p>
+    </div>
+    <div class="login-error" id="loginError"></div>
+    <div class="field">
+      <label>Usuário</label>
+      <input type="text" id="loginUser" placeholder="seu usuário" />
+    </div>
+    <div class="field">
+      <label>Senha</label>
+      <input type="password" id="loginPass" placeholder="••••••••" />
+    </div>
+    <button class="btn-login" id="btnLogin" onclick="fazerLogin()">ENTRAR</button>
+  </div>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashPage">
+  <div class="header">
+    <div class="header-logo">
+      <div class="icon">₿</div>
+      <h1>BOT <span>NOVADAX</span></h1>
+    </div>
+    <div class="header-right">
+      <span class="badge badge-real">🟢 REAL</span>
+      <span class="badge badge-user" id="userBadge">👤 —</span>
+      <div class="dot-status" id="dotStatus"></div>
+      <span id="statusLabel" style="font-size:12px;color:var(--muted)">desconectado</span>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Cards topo -->
+    <div class="grid4">
+      <div class="card">
+        <div class="card-label" id="precoLabel">Preço BTC/BRL</div>
+        <div class="card-value green" id="preco">—</div>
+        <div class="card-sub" id="sinalAtual">Sinal: —</div>
+      </div>
+      <div class="card">
+        <div class="card-label">P&L Posição Atual</div>
+        <div class="card-value" id="pnlAtual">—</div>
+        <div class="card-sub" id="pnlSub">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Capital Atual</div>
+        <div class="card-value green" id="capitalAtual">—</div>
+        <div class="card-sub" id="capitalInicial">Inicial: —</div>
+        <div class="card-sub" id="saldoBrl">BRL livre: —</div>
+        <div class="card-sub" id="saldoCripto">Em cripto: —</div>
+        <div class="card-sub green" id="saldoTotal">Total: —</div>
+      </div>
+      <div class="card">
+        <div class="card-label">Resultado do Dia</div>
+        <div class="card-value" id="resultadoDia">—</div>
+        <div class="card-sub" id="winsLosses">— wins / — losses</div>
+      </div>
+    </div>
+
+    <!-- Posições -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-label" style="margin-bottom:10px">Posições Abertas <span id="posCount" style="color:var(--blue)">0/2</span></div>
+      <div id="posList"><span style="color:var(--muted);font-size:12px">Sem posições abertas</span></div>
+      <div class="card-sub" id="pnlTotal" style="margin-top:8px">P&L Total: —</div>
+    </div>
+
+    <!-- Monitor de pares -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-label" style="margin-bottom:12px">Monitor de Pares</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Par</th><th>Preço</th><th>Score</th><th>Sinal</th>
+            <th>RSI</th><th>Volume</th><th>Queda 24h</th><th>Motivo</th>
+          </tr></thead>
+          <tbody id="tabelaPares">
+            <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Aguardando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Carteira -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-label" style="margin-bottom:12px">💼 Carteira Completa</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Moeda</th><th>Quantidade</th><th>Preço</th><th>Valor BRL</th><th>Variação</th></tr></thead>
+          <tbody id="tabelaCarteira">
+            <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:20px">Aguardando...</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:12px;font-family:var(--mono)">
+        BRL: <span id="brlCarteira" style="color:var(--green)">—</span> &nbsp;|&nbsp;
+        Total: <span id="totalCarteira" style="color:var(--green);font-weight:700">—</span>
+      </div>
+    </div>
+
+    <!-- Histórico -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-label" style="margin-bottom:12px">Histórico de Operações</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Data</th><th>Par</th><th>Tipo</th><th>Compra</th><th>Venda</th><th>P&L</th><th></th></tr></thead>
+          <tbody id="tabelaHistorico">
+            <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px">Sem operações</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Feed -->
+    <div class="card">
+      <div class="card-label" style="margin-bottom:10px">Feed de Eventos</div>
+      <div id="feedEventos" style="font-family:var(--mono);font-size:11px;max-height:200px;overflow-y:auto">
+        <span style="color:var(--muted)">Aguardando...</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+let authToken  = null;
+let interval   = null;
+
+// ── LOGIN ──
+document.getElementById('loginPass').addEventListener('keypress', e => {
+  if (e.key === 'Enter') fazerLogin();
+});
+
+async function fazerLogin() {
+  const user = document.getElementById('loginUser').value.trim();
+  const pass = document.getElementById('loginPass').value;
+  const btn  = document.getElementById('btnLogin');
+  const err  = document.getElementById('loginError');
+
+  if (!user || !pass) { mostrarErroLogin('Preencha usuário e senha'); return; }
+
+  btn.disabled = true; btn.textContent = 'Entrando...';
+  err.style.display = 'none';
+
+  try {
+    const res  = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({username: user, password: pass})
+    });
+    const data = await res.json();
+    if (!res.ok) { mostrarErroLogin(data.error || 'Erro ao fazer login'); return; }
+
+    authToken = data.token;
+    mostrarDashboard(data.name || data.username);
+
+  } catch(e) {
+    mostrarErroLogin('Erro de conexão com o servidor');
+  } finally {
+    btn.disabled = false; btn.textContent = 'ENTRAR';
+  }
+}
+
+function mostrarErroLogin(msg) {
+  const el = document.getElementById('loginError');
+  el.textContent = msg; el.style.display = 'block';
+}
+
+// ── DASHBOARD ──
+function mostrarDashboard(nome) {
+  document.getElementById('loginPage').style.display = 'none';
+  document.getElementById('dashPage').style.display  = 'block';
+  document.getElementById('userBadge').textContent   = `👤 ${nome}`;
+  atualizar();
+  interval = setInterval(atualizar, 10000);
+}
+
+function logout() {
+  authToken = null;
+  clearInterval(interval);
+  document.getElementById('dashPage').style.display  = 'none';
+  document.getElementById('loginPage').style.display = 'flex';
+  document.getElementById('loginPass').value = '';
+}
+
+function headers() {
+  return {'Content-Type':'application/json', 'Authorization': `Bearer ${authToken}`};
+}
+
+async function atualizar() {
+  try {
+    const [rs, rh, rf] = await Promise.all([
+      fetch(`${API_BASE}/status`,    {headers: headers()}),
+      fetch(`${API_BASE}/historico`, {headers: headers()}),
+      fetch(`${API_BASE}/feed`,      {headers: headers()}),
+    ]);
+    if (rs.status === 401) { logout(); return; }
+    const [d, h, f] = await Promise.all([rs.json(), rh.json(), rf.json()]);
+    renderStatus(d);
+    renderHistorico(h);
+    renderPares(d.pares_detalhes);
+    renderCarteira(d.carteira_full, d.saldo_brl, d.saldo_total);
+    renderFeed(f);
+    setOnline(true, d.status);
+  } catch(e) {
+    setOnline(false);
+  }
+}
+
+function setOnline(online, status) {
+  const dot = document.getElementById('dotStatus');
+  const lbl = document.getElementById('statusLabel');
+  dot.className = 'dot-status' + (online ? ' online' : '');
+  lbl.textContent = online ? (status || 'rodando') : 'desconectado';
+}
+
+function renderStatus(d) {
+  const fmt = (n, dec=2) => Number(n||0).toLocaleString('pt-BR', {minimumFractionDigits:dec});
+
+  // Preço BTC
+  const btcPreco = d.pares_detalhes?.['BTC/BRL']?.preco || d.preco_atual || 0;
+  document.getElementById('preco').textContent = 'R$' + fmt(btcPreco);
+  document.getElementById('sinalAtual').textContent = `Sinal: ${d.sinal_atual||'NEUTRO'} | RSI: ${d.rsi_atual||0}`;
+
+  // Capital
+  const capEl = document.getElementById('capitalAtual');
+  capEl.textContent = 'R$' + fmt(d.capital_atual);
+  capEl.className = 'card-value ' + (d.capital_atual >= (d.capital_inicial||0) ? 'green' : 'red');
+  document.getElementById('capitalInicial').textContent = `Inicial: R$${fmt(d.capital_inicial)}`;
+  document.getElementById('saldoBrl').textContent    = `BRL livre: R$${fmt(d.saldo_brl)}`;
+  document.getElementById('saldoCripto').textContent = `Em cripto: R$${fmt(d.saldo_cripto)}`;
+  document.getElementById('saldoTotal').textContent  = `Total carteira: R$${fmt(d.saldo_total)}`;
+
+  // Resultado do dia
+  const res = d.resultado_dia || 0;
+  const resEl = document.getElementById('resultadoDia');
+  resEl.textContent = (res >= 0 ? '+' : '') + 'R$' + fmt(res);
+  resEl.className = 'card-value ' + (res >= 0 ? 'green' : 'red');
+  document.getElementById('winsLosses').textContent = `${d.wins_dia||0} wins / ${d.losses_dia||0} losses`;
+
+  // Posições
+  const posicoes = d.posicoes || {};
+  const novas = Object.values(posicoes).filter(p => p.tipo === 'novo');
+  document.getElementById('posCount').textContent = `${novas.length}/${d.max_posicoes||2}`;
+  const lista = document.getElementById('posList');
+  if (Object.keys(posicoes).length === 0) {
+    lista.innerHTML = '<span style="color:var(--muted);font-size:12px">Sem posições abertas</span>';
+  } else {
+    lista.innerHTML = Object.entries(posicoes).map(([par, pos]) => {
+      const cor = pos.pnl_pct >= 0 ? 'var(--green)' : 'var(--red)';
+      const tipo = pos.tipo === 'novo' ? '🟢' : pos.tipo === 'antigo' ? '🔵' : '🟡';
+      return `<div class="pos-row">
+        <span style="color:var(--blue);font-weight:700;min-width:90px">${tipo} ${par}</span>
+        <span>C: R$${pos.preco_compra}</span>
+        <span>A: R$${pos.preco_atual}</span>
+        <span>Qtd: ${pos.quantidade}</span>
+        <span style="color:${cor};font-weight:700">${pos.pnl_pct>=0?'+':''}${pos.pnl_pct}% (R$${pos.pnl_usd>=0?'+':''}${pos.pnl_usd})</span>
+      </div>`;
+    }).join('');
+  }
+  const pnlTotal = d.pnl_total_usd || 0;
+  const pnlCor = pnlTotal >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('pnlTotal').innerHTML = `P&L Total: <span style="color:${pnlCor};font-weight:700">${pnlTotal>=0?'+':''}R$${fmt(pnlTotal)}</span>`;
+
+  // PnL card
+  if (Object.keys(posicoes).length > 0) {
+    document.getElementById('pnlAtual').textContent = (pnlTotal>=0?'+':'') + 'R$' + fmt(pnlTotal);
+    document.getElementById('pnlAtual').className = 'card-value ' + (pnlTotal>=0?'green':'red');
+    document.getElementById('pnlSub').textContent = `${Object.keys(posicoes).length} posição(ões) abertas`;
+  } else {
+    document.getElementById('pnlAtual').textContent = '—';
+    document.getElementById('pnlAtual').className = 'card-value';
+    document.getElementById('pnlSub').textContent = 'Sem posição aberta';
+  }
+}
+
+function renderPares(pares) {
+  if (!pares) return;
+  const tbody = document.getElementById('tabelaPares');
+  const rows = Object.entries(pares).map(([par, d]) => {
+    const sinCor = d.sinal === 'COMPRA' ? 'var(--green)' : d.sinal === 'VENDA' ? 'var(--red)' : 'var(--muted)';
+    const q24Cor = d.queda_24h <= -10 ? 'var(--red)' : d.queda_24h <= -5 ? 'var(--yellow)' : 'var(--muted)';
+    return `<tr>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--blue)">${par}</td>
+      <td style="font-family:var(--mono)">R$${d.preco?.toLocaleString('pt-BR',{minimumFractionDigits:4})}</td>
+      <td style="font-family:var(--mono);color:${d.score>=4?'var(--green)':d.score>0?'var(--yellow)':'var(--red)'}">${d.score}</td>
+      <td style="color:${sinCor};font-weight:700">${d.sinal}</td>
+      <td style="font-family:var(--mono)">${d.rsi}</td>
+      <td style="text-align:center">${d.volume_ok?'✓':'✗'}</td>
+      <td style="font-family:var(--mono);color:${q24Cor}">${d.queda_24h||0}%</td>
+      <td style="font-size:10px;color:var(--muted)">${(d.motivos||[]).join(' · ')}</td>
+    </tr>`;
+  }).join('');
+  tbody.innerHTML = rows || '<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:20px">Aguardando...</td></tr>';
+}
+
+function renderCarteira(carteira, saldo_brl, saldo_total) {
+  const tbody = document.getElementById('tabelaCarteira');
+  document.getElementById('brlCarteira').textContent = 'R$' + Number(saldo_brl||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('totalCarteira').textContent = 'R$' + Number(saldo_total||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  if (!carteira || Object.keys(carteira).length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px">Sem criptos</td></tr>';
+    return;
+  }
+  const sorted = Object.entries(carteira).sort((a,b) => b[1].valor_brl - a[1].valor_brl);
+  tbody.innerHTML = sorted.map(([moeda, info]) => `
+    <tr>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--blue)">${moeda}</td>
+      <td style="font-family:var(--mono);font-size:11px">${info.quantidade}</td>
+      <td style="font-family:var(--mono);font-size:11px">R$${Number(info.preco).toLocaleString('pt-BR',{minimumFractionDigits:4})}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:var(--green)">R$${info.valor_brl?.toFixed(2)}</td>
+      <td style="font-size:11px;color:var(--muted)">+0% / meta 10%</td>
+    </tr>`).join('');
+}
+
+function renderHistorico(trades) {
+  const tbody = document.getElementById('tabelaHistorico');
+  if (!trades?.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px">Sem operações</td></tr>';
+    return;
+  }
+  tbody.innerHTML = [...trades].reverse().map(t => {
+    const cor = t.resultado === 'win' ? 'var(--green)' : 'var(--red)';
+    const tipoCor = t.tipo === 'STOP LOSS' ? 'var(--red)' : t.tipo === 'TRAILING STOP' ? 'var(--blue)' : 'var(--muted)';
+    return `<tr>
+      <td style="font-size:11px;color:var(--muted)">${t.data}</td>
+      <td style="font-family:var(--mono);color:var(--blue);font-weight:700">${t.par}</td>
+      <td style="font-size:11px;color:${tipoCor}">${t.tipo}</td>
+      <td style="font-family:var(--mono);font-size:11px">R$${t.preco_compra}</td>
+      <td style="font-family:var(--mono);font-size:11px">R$${t.preco_venda}</td>
+      <td style="font-family:var(--mono);font-weight:700;color:${cor}">${t.pnl_pct>=0?'+':''}${t.pnl_pct}%</td>
+      <td><span style="padding:2px 8px;border-radius:10px;font-size:10px;background:${t.resultado==='win'?'rgba(0,255,136,0.1)':'rgba(255,68,85,0.1)'};color:${cor}">${t.resultado?.toUpperCase()}</span></td>
+    </tr>`;
+  }).join('');
+}
+
+function renderFeed(eventos) {
+  const div = document.getElementById('feedEventos');
+  if (!eventos?.length) { div.innerHTML = '<span style="color:var(--muted)">Aguardando...</span>'; return; }
+  const cores = {COMPRA:'var(--green)',VENDA:'#38bdf8',ALERTA:'var(--red)',INFO:'var(--muted)'};
+  div.innerHTML = eventos.slice(0,30).map(e =>
+    `<div style="margin-bottom:3px"><span style="color:var(--muted)">${e.hora}</span> <span style="color:${cores[e.tipo]||'var(--muted)'}">▸</span> <span style="color:${e.tipo==='INFO'?'var(--muted)':'var(--text)'}">${e.msg}</span></div>`
+  ).join('');
+}
+</script>
+</body>
+</html>

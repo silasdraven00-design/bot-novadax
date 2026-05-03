@@ -244,11 +244,16 @@ def add_headers(response):
 
 @app.route('/')
 def index():
-    return app.send_static_file('login.html')
+    return app.send_static_file('app.html')
 
 @app.route('/dashboard')
 def dashboard():
     return app.send_static_file('dashboard_novadax.html')
+
+@app.route('/app')
+def app_page():
+    """Página única — login + dashboard sem redirect"""
+    return app.send_static_file('app.html')
 
 @app.route('/status')
 @requer_auth
