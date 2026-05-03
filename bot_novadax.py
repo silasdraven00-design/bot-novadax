@@ -228,7 +228,7 @@ def carregar_historico():
 # ─────────────────────────────────────────────
 # 🌐 Flask API
 # ─────────────────────────────────────────────
-app = Flask(__name__)
+app = Flask(__name__, static_folder='.', static_url_path='')
 CORS(app, origins="*")
 
 # Importa sistema de autenticação
@@ -241,6 +241,14 @@ def add_headers(response):
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     response.headers['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
     return response
+
+@app.route('/')
+def index():
+    return app.send_static_file('login.html')
+
+@app.route('/dashboard')
+def dashboard():
+    return app.send_static_file('dashboard_novadax.html')
 
 @app.route('/status')
 @requer_auth
