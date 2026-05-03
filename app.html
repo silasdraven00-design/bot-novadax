@@ -242,15 +242,21 @@ async function fazerLogin() {
 
   if (!user || !pass) { mostrarErroLogin('Preencha usuário e senha'); return; }
 
-  btn.disabled = true; btn.textContent = 'Entrando...';
+  btn.disabled = true; btn.textContent = 'Aguardando servidor...';
   err.style.display = 'none';
 
   try {
+    // Render plano free hiberna — timeout de 60s pra dar tempo de acordar
+    const controller = new AbortController();
+    const tid = setTimeout(() => controller.abort(), 60000);
+
     const res  = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({username: user, password: pass})
+      body: JSON.stringify({username: user, password: pass}),
+      signal: controller.signal
     });
+    clearTimeout(tid);
     const data = await res.json();
     if (!res.ok) { mostrarErroLogin(data.error || 'Erro ao fazer login'); return; }
 
@@ -258,7 +264,11 @@ async function fazerLogin() {
     mostrarDashboard(data.name || data.username);
 
   } catch(e) {
-    mostrarErroLogin('Erro de conexão com o servidor');
+    if (e.name === 'AbortError') {
+      mostrarErroLogin('Servidor demorou muito — tente novamente em alguns segundos');
+    } else {
+      mostrarErroLogin('Erro de conexão: ' + e.message);
+    }
   } finally {
     btn.disabled = false; btn.textContent = 'ENTRAR';
   }
