@@ -438,7 +438,7 @@ const botUser = localStorage.getItem('bot_name') || localStorage.getItem('bot_us
 const botRole = localStorage.getItem('bot_role');
 
 if (!token) {
-  window.location.href = 'login.html';
+  window.location.replace('/');
 }
 
 function getHeaders() {
@@ -453,7 +453,7 @@ function logout() {
   localStorage.removeItem('bot_user');
   localStorage.removeItem('bot_role');
   localStorage.removeItem('bot_name');
-  window.location.href = 'login.html';
+  window.location.replace('/');
 }
 
 let API_URL = localStorage.getItem('bot_api_url') || 'http://localhost:5000';

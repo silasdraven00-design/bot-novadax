@@ -153,7 +153,7 @@ async function fazerLogin() {
     localStorage.setItem('bot_api_url', apiUrl);
 
     // Redireciona pro dashboard
-    window.location.href = 'dashboard_novadax.html';
+    window.location.replace('/dashboard');
 
   } catch(e) {
     mostrarErro('Não foi possível conectar à API. Verifique a URL.');
