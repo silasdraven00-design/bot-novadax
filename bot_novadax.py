@@ -1101,6 +1101,37 @@ def rodar_bot():
             # Checa queda brusca em todos
             checar_queda_brusca_todos()
 
+            # ── Analisa criptos avulsas da carteira ──
+            # Se o usuário comprou manualmente uma cripto nova, o bot passa a monitorar
+            try:
+                bal_check = exchange.fetch_balance()
+                for moeda, qtd_info in bal_check['total'].items():
+                    if moeda == 'BRL':
+                        continue
+                    qtd = float(qtd_info or 0)
+                    if qtd <= 0:
+                        continue
+                    par = f"{moeda}/BRL"
+                    # Se não tá sendo monitorado ainda — adiciona
+                    if par not in estado['posicoes'] and par not in PARES:
+                        try:
+                            ticker = exchange.fetch_ticker(par)
+                            preco  = float(ticker['last'])
+                            valor  = qtd * preco
+                            if valor >= 1.0:  # ignora valores irrisórios
+                                estado['posicoes'][par] = {
+                                    'preco_compra': preco,
+                                    'quantidade':   qtd,
+                                    'preco_pico':   preco,
+                                    'tipo':         'avulso',
+                                }
+                                log.info(f"Nova cripto detectada: {par} | R${valor:.2f} — adicionada ao monitoramento")
+                                add_evento('INFO', f"Nova cripto: {par} | R${valor:.2f} — monitorando (vende +10%)")
+                        except:
+                            pass
+            except:
+                pass
+
             # Analisa pares sem posição
             # Conta só posições novas pra não bloquear os 5 slots com as antigas
             posicoes_novas = {k: v for k, v in estado['posicoes'].items() if v.get('tipo') != 'antigo'}
@@ -1178,11 +1209,15 @@ def rodar_bot():
                     estado['rsi_atual']   = melhor_score['rsi']
                     estado['preco_atual'] = melhor_score['preco']
 
-                # Atualiza saldo BRL
+                # Atualiza saldo BRL — não sobrescreve o total calculado com cripto
                 try:
                     bal = exchange.fetch_balance()
-                    estado['saldo_brl']  = float(bal['free'].get('BRL', 0))
-                    estado['saldo_total'] = estado['saldo_brl']
+                    estado['saldo_brl'] = float(bal['free'].get('BRL', 0))
+                    # Mantém saldo_total com BRL + cripto calculado no ciclo principal
+                    if estado['saldo_cripto'] > 0:
+                        estado['saldo_total'] = round(estado['saldo_brl'] + estado['saldo_cripto'], 2)
+                    else:
+                        estado['saldo_total'] = estado['saldo_brl']
                 except:
                     pass
 

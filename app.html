@@ -409,8 +409,11 @@ function renderPares(pares) {
 
 function renderCarteira(carteira, saldo_brl, saldo_total) {
   const tbody = document.getElementById('tabelaCarteira');
-  document.getElementById('brlCarteira').textContent = 'R$' + Number(saldo_brl||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
-  document.getElementById('totalCarteira').textContent = 'R$' + Number(saldo_total||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  // Total real = BRL + soma de todas as criptos
+  const totalCripto = Object.values(carteira||{}).reduce((s,c) => s + (c.valor_brl||0), 0);
+  const totalReal   = (saldo_brl||0) + totalCripto;
+  document.getElementById('brlCarteira').textContent   = 'R$' + Number(saldo_brl||0).toLocaleString('pt-BR',{minimumFractionDigits:2});
+  document.getElementById('totalCarteira').textContent = 'R$' + totalReal.toLocaleString('pt-BR',{minimumFractionDigits:2});
   if (!carteira || Object.keys(carteira).length === 0) {
     tbody.innerHTML = '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px">Sem criptos</td></tr>';
     return;
